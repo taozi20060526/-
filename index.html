@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>系列位置效应（D3）</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+      :root {
+        --fg: #1f2b2a;
+        --muted: #4f6461;
+        --grid: #d5e6e2;
+        --card: rgba(255, 255, 255, 0.82);
+        --card-border: rgba(82, 125, 117, 0.22);
+        --select-bg: #ffdff0;
+        --select-border: #f0a9cf;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+        color: var(--fg);
+        background: linear-gradient(145deg, #ecfbf6 0%, #eaf7ff 45%, #f8eefb 100%);
+      }
+      .page {
+        width: min(1280px, 96vw);
+        margin: 0 auto;
+        padding: 22px 0 18px;
+      }
+      header {
+        padding: 18px 24px;
+        border-radius: 16px;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        backdrop-filter: blur(2px);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 34px;
+        letter-spacing: 0.4px;
+        line-height: 1.2;
+      }
+      .meta {
+        margin: 4px 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      .controls {
+        margin-top: 14px;
+        padding: 14px 24px;
+        border-radius: 14px;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .control-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .control-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      label {
+        font-size: 18px;
+        font-weight: 600;
+        color: #355450;
+      }
+      select {
+        font-size: 17px;
+        font-weight: 600;
+        color: #4a2f3f;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--select-border);
+        background: var(--select-bg);
+        outline: none;
+      }
+      .btn-export {
+        font-size: 14px;
+        font-weight: 700;
+        color: #2e4f49;
+        background: #e6f5ef;
+        border: 1px solid #9bc9b8;
+        border-radius: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+      }
+      .btn-export:hover {
+        background: #d8f0e7;
+      }
+      .legend {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--muted);
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.65);
+      }
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+      }
+      .chart-wrap {
+        margin-top: 14px;
+        border-radius: 16px;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        padding: 12px 12px 8px;
+      }
+      #chart {
+        width: 100%;
+      }
+      svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .axis text {
+        font-size: 13px;
+        fill: #395451;
+      }
+      .axis path,
+      .axis line {
+        stroke: #b8ccc8;
+      }
+      .grid line {
+        stroke: var(--grid);
+      }
+      .axis-label {
+        font-size: 15px;
+        font-weight: 700;
+        fill: #355450;
+      }
+      .tooltip {
+        position: fixed;
+        pointer-events: none;
+        background: rgba(24, 31, 30, 0.94);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 13px;
+        line-height: 1.4;
+        opacity: 0;
+        transform: translate(-50%, -108%);
+        white-space: nowrap;
+        z-index: 20;
+      }
+      .hint {
+        margin-top: 8px;
+        color: #54706c;
+        font-size: 13px;
+      }
+      .zone-label {
+        font-size: 12px;
+        font-weight: 700;
+        fill: #4b5f5c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>系列位置效应：三实验回忆正确率可视化</h1>
+        <p class="meta">横轴：序列位置（1–30）；纵轴：正确率（%）</p>
+        <p class="meta">数据来源：<code>data.csv</code>（由三份同学记录的原始数据表汇总生成）</p>
+      </header>
+
+      <section class="controls">
+        <div class="control-left">
+          <label for="expSelect">选择实验</label>
+          <select id="expSelect"></select>
+        </div>
+        <div class="control-right">
+          <button id="exportBtn" class="btn-export">导出原图（PNG）</button>
+          <div id="legend" class="legend"></div>
+        </div>
+      </section>
+
+      <section class="chart-wrap">
+        <div id="chart"></div>
+        <div class="hint">提示：将鼠标移动到折线上的圆点，可查看该序列位置的精确正确率。阴影区采用常见自由回忆划分：首因区 1–6，近因区 25–30。</div>
+      </section>
+    </div>
+
+    <div id="tip" class="tooltip"></div>
+
+    <script>
+      const margin = { top: 22, right: 28, bottom: 66, left: 74 };
+      const colorByExperiment = {
+        实验一: "#2f67d8",
+        实验二: "#2fa36d",
+        实验三: "#d455a5",
+      };
+
+      const expSelect = d3.select("#expSelect");
+      const legend = d3.select("#legend");
+      const tip = d3.select("#tip");
+      const exportBtn = d3.select("#exportBtn");
+
+      const chart = d3.select("#chart");
+      const svg = chart.append("svg").attr("viewBox", "0 0 1240 700");
+      const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const x = d3.scaleLinear().domain([1, 30]).nice();
+      const y = d3.scaleLinear().domain([0, 1]).nice();
+
+      const gridG = g.append("g").attr("class", "grid");
+      const zoneG = g.append("g").attr("class", "zones");
+      const xAxisG = g.append("g").attr("class", "axis x-axis");
+      const yAxisG = g.append("g").attr("class", "axis y-axis");
+      const plotG = g.append("g").attr("class", "plot");
+      const xLabel = g.append("text").attr("class", "axis-label").attr("text-anchor", "middle").text("序列位置");
+      const yLabel = g
+        .append("text")
+        .attr("class", "axis-label")
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("正确率");
+
+      const line = d3
+        .line()
+        .x((d) => x(d.position))
+        .y((d) => y(d.accuracy))
+        .curve(d3.curveMonotoneX);
+
+      let raw = [];
+
+      function size() {
+        const w = chart.node().clientWidth || 1240;
+        const innerW = Math.max(820, w) - margin.left - margin.right;
+        const innerH = 700 - margin.top - margin.bottom;
+        return { innerW, innerH };
+      }
+
+      function renderAxes(innerW, innerH) {
+        x.range([0, innerW]);
+        y.range([innerH, 0]);
+
+        const xTicks = d3.range(1, 31, 1);
+        const yTicks = d3.range(0, 101, 10).map((t) => t / 100);
+
+        xAxisG.attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).tickValues(xTicks).tickFormat(d3.format("d")));
+        yAxisG.call(d3.axisLeft(y).tickValues(yTicks).tickFormat((d) => `${Math.round(d * 100)}%`));
+
+        xAxisG.selectAll("text").attr("dy", "10px");
+        yAxisG.selectAll("text").attr("dx", "-6px");
+
+        gridG
+          .call(d3.axisLeft(y).tickValues(yTicks).tickSize(-innerW).tickFormat(""))
+          .call((gx) => gx.select(".domain").remove());
+
+        // 阴影区：首因(1-6) 与 近因(25-30)
+        zoneG.selectAll("*").remove();
+        const primacyX = x(1);
+        const primacyW = x(6) - x(1);
+        const recencyX = x(25);
+        const recencyW = x(30) - x(25);
+
+        zoneG
+          .append("rect")
+          .attr("x", primacyX)
+          .attr("y", 0)
+          .attr("width", primacyW)
+          .attr("height", innerH)
+          .attr("fill", "#2f67d8")
+          .attr("opacity", 0.08);
+        zoneG
+          .append("text")
+          .attr("class", "zone-label")
+          .attr("x", primacyX + primacyW / 2)
+          .attr("y", 18)
+          .attr("text-anchor", "middle")
+          .text("首因区 1–6");
+
+        zoneG
+          .append("rect")
+          .attr("x", recencyX)
+          .attr("y", 0)
+          .attr("width", recencyW)
+          .attr("height", innerH)
+          .attr("fill", "#d455a5")
+          .attr("opacity", 0.08);
+        zoneG
+          .append("text")
+          .attr("class", "zone-label")
+          .attr("x", recencyX + recencyW / 2)
+          .attr("y", 18)
+          .attr("text-anchor", "middle")
+          .text("近因区 25–30");
+
+        xLabel.attr("x", innerW / 2).attr("y", innerH + 52);
+        yLabel.attr("x", -innerH / 2).attr("y", -52);
+      }
+
+      function renderLegend(exp, condition) {
+        legend.selectAll("*").remove();
+        const color = colorByExperiment[exp] || "#4b7be5";
+
+        const item = legend.append("div").attr("class", "item");
+        item.append("div").attr("class", "swatch").style("background", color);
+        item.append("div").text(`${exp} · ${condition}`);
+      }
+
+      function formatPct(v) {
+        return `${(v * 100).toFixed(1)}%`;
+      }
+
+      function renderChart() {
+        const exp = expSelect.property("value");
+        const { innerW, innerH } = size();
+        renderAxes(innerW, innerH);
+
+        const rows = raw.filter((d) => d.experiment === exp).sort((a, b) => a.position - b.position);
+        if (!rows.length) return;
+
+        const condition = rows[0].condition;
+        const c = colorByExperiment[exp] || "#4b7be5";
+        renderLegend(exp, condition);
+
+        plotG.selectAll("*").remove();
+
+        plotG
+          .append("path")
+          .datum(rows)
+          .attr("fill", "none")
+          .attr("stroke", c)
+          .attr("stroke-width", 4)
+          .attr("d", line);
+
+        plotG
+          .selectAll("circle")
+          .data(rows)
+          .join("circle")
+          .attr("cx", (d) => x(d.position))
+          .attr("cy", (d) => y(d.accuracy))
+          .attr("r", 5.5)
+          .attr("fill", "#fff")
+          .attr("stroke", c)
+          .attr("stroke-width", 3)
+          .on("mousemove", (event, d) => {
+            tip
+              .style("opacity", 1)
+              .html(
+                `<div><b>${exp}</b></div>` +
+                  `<div>${condition}</div>` +
+                  `<div>序列位置：${d.position}</div>` +
+                  `<div>正确率：${formatPct(d.accuracy)}</div>`
+              )
+              .style("left", `${event.clientX}px`)
+              .style("top", `${event.clientY}px`);
+          })
+          .on("mouseleave", () => tip.style("opacity", 0));
+      }
+
+      async function load() {
+        raw = await d3.csv("data.csv", (d) => ({
+          experiment: String(d.experiment).trim(),
+          condition: String(d.condition).trim(),
+          position: +d.position,
+          accuracy: +d.accuracy,
+        }));
+
+        const bad = raw.find((d) => !d.experiment || !d.condition || !Number.isFinite(d.position) || !Number.isFinite(d.accuracy));
+        if (bad) throw new Error("CSV 解析失败：请检查字段名与数值。");
+
+        const order = ["实验一", "实验二", "实验三"];
+        const exps = Array.from(new Set(raw.map((d) => d.experiment))).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+        expSelect
+          .selectAll("option")
+          .data(exps)
+          .join("option")
+          .attr("value", (d) => d)
+          .text((d) => {
+            if (d === "实验一") return "实验一：1 秒/词，立即回忆";
+            if (d === "实验二") return "实验二：2 秒/词，立即回忆";
+            if (d === "实验三") return "实验三：1 秒/词，延迟 30 秒回忆";
+            return d;
+          });
+
+        expSelect.property("value", exps[0]);
+        expSelect.on("change", renderChart);
+        window.addEventListener("resize", renderChart);
+        exportBtn.on("click", exportPNG);
+        renderChart();
+      }
+
+      function exportPNG() {
+        const svgNode = svg.node();
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svgNode);
+        const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+
+        const img = new Image();
+        img.onload = () => {
+          const vb = svgNode.viewBox.baseVal;
+          const canvas = document.createElement("canvas");
+          canvas.width = vb.width;
+          canvas.height = vb.height;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+
+          const a = document.createElement("a");
+          const exp = expSelect.property("value") || "实验";
+          a.download = `${exp}_系列位置曲线.png`;
+          a.href = canvas.toDataURL("image/png");
+          a.click();
+        };
+        img.src = url;
+      }
+
+      load().catch((err) => {
+        chart.append("div").style("padding", "12px").style("color", "#b00020").text(String(err));
+      });
+    </script>
+  </body>
+</html>
