@@ -198,7 +198,7 @@
 
       <section class="chart-wrap">
         <div id="chart"></div>
-        <div class="hint">提示：将鼠标移动到折线上的圆点，可查看该序列位置的精确正确率。阴影区采用常见自由回忆划分：首因区 1–6，近因区 25–30。</div>
+        <div class="hint">提示：将鼠标移动到折线上的圆点，可查看该序列位置的精确正确率。阴影区采用常见自由回忆划分：首因区 1–6，中间区 7–24，近因区 25–30。</div>
       </section>
     </div>
 
@@ -256,7 +256,7 @@
         x.range([0, innerW]);
         y.range([innerH, 0]);
 
-        const xTicks = d3.range(1, 31, 1);
+        const xTicks = d3.range(1, 31, 2);
         const yTicks = d3.range(0, 101, 10).map((t) => t / 100);
 
         xAxisG.attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).tickValues(xTicks).tickFormat(d3.format("d")));
@@ -269,10 +269,12 @@
           .call(d3.axisLeft(y).tickValues(yTicks).tickSize(-innerW).tickFormat(""))
           .call((gx) => gx.select(".domain").remove());
 
-        // 阴影区：首因(1-6) 与 近因(25-30)
+        // 阴影区：首因(1-6)、中间(7-24)、近因(25-30)
         zoneG.selectAll("*").remove();
         const primacyX = x(1);
         const primacyW = x(6) - x(1);
+        const middleX = x(7);
+        const middleW = x(24) - x(7);
         const recencyX = x(25);
         const recencyW = x(30) - x(25);
 
@@ -291,6 +293,22 @@
           .attr("y", 18)
           .attr("text-anchor", "middle")
           .text("首因区 1–6");
+
+        zoneG
+          .append("rect")
+          .attr("x", middleX)
+          .attr("y", 0)
+          .attr("width", middleW)
+          .attr("height", innerH)
+          .attr("fill", "#4fbf96")
+          .attr("opacity", 0.07);
+        zoneG
+          .append("text")
+          .attr("class", "zone-label")
+          .attr("x", middleX + middleW / 2)
+          .attr("y", 18)
+          .attr("text-anchor", "middle")
+          .text("中间区 7–24");
 
         zoneG
           .append("rect")
@@ -315,10 +333,15 @@
       function renderLegend(exp, condition) {
         legend.selectAll("*").remove();
         const color = colorByExperiment[exp] || "#4b7be5";
+        const shortConditionMap = {
+          实验一: "1秒/词 · 即时回忆",
+          实验二: "2秒/词 · 即时回忆",
+          实验三: "1秒/词 · 延迟30秒回忆",
+        };
 
         const item = legend.append("div").attr("class", "item");
         item.append("div").attr("class", "swatch").style("background", color);
-        item.append("div").text(`${exp} · ${condition}`);
+        item.append("div").text(`${exp} · ${shortConditionMap[exp] || condition}`);
       }
 
       function formatPct(v) {
